@@ -47,7 +47,7 @@ if (empty($issues)) {
             $assigneeStr .= $assignee['username'] . ', ';
         }
         $title = $issue['title'];
-        $link = $config['gitlab']['short_url'] . '/root/getcourse/-/issues/' . $issue['iid'];
+        $link = $issue['expired'] . 'h ' . $config['gitlab']['short_url'] . '/root/getcourse/-/issues/' . $issue['iid'];
         $titles .= "[{$link}]({$title}), " . "{$assigneeStr}" . PHP_EOL;
     }
 }

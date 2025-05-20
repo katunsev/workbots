@@ -104,25 +104,32 @@ class GitLabService extends BaseService
      */
     public function getOverdueIssuesFromUnestimatedOrLabeled(array $labels = [], array $additionalFilter = []): array
     {
-        $issues = $this->getOpenedIssuesWithoutEstimateOrLabels($labels, $additionalFilter);
+        $filter = array_merge(['state' => 'opened', 'per_page' => 100], $additionalFilter);
 
         $result = [];
-        foreach ($issues as $issue) {
-            $estimate = 0;
-            $spent = 0;
-            if (isset($issue['time_stats']['time_estimate'])) {
-                $estimate = $issue['time_stats']['time_estimate'];
-            } elseif (isset($issue['time_estimate'])) {
-                $estimate = $issue['time_estimate'];
-            }
-            if (isset($issue['time_stats']['total_time_spent'])) {
-                $spent = $issue['time_stats']['total_time_spent'];
-            } elseif (isset($issue['total_time_spent'])) {
-                $spent = $issue['total_time_spent'];
-            }
 
-            if ($estimate > 0 && $spent >= $estimate) {
-                $result[] = $issue;
+        foreach ($labels as $label) {
+            $filter['labels'] = $label;
+            $batch = $this->client->issues()->all($this->projectId, $filter);
+
+            foreach ($batch as $issue) {
+                $estimate = 0;
+                $spent = 0;
+                if (isset($issue['time_stats']['time_estimate'])) {
+                    $estimate = $issue['time_stats']['time_estimate'];
+                } elseif (isset($issue['time_estimate'])) {
+                    $estimate = $issue['time_estimate'];
+                }
+                if (isset($issue['time_stats']['total_time_spent'])) {
+                    $spent = $issue['time_stats']['total_time_spent'];
+                } elseif (isset($issue['total_time_spent'])) {
+                    $spent = $issue['total_time_spent'];
+                }
+
+                if ($spent >= $estimate) {
+                    $issue['expired'] = ($spent - $estimate) / 3600;
+                    $result[] = $issue;
+                }
             }
         }
 
