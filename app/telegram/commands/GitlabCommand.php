@@ -1,11 +1,11 @@
 <?php
-namespace App\Telegram\Commands;
+namespace app\telegram\commands;
 
+use App\services\AuthService;
+use App\services\GitLabService;
+use App\services\RateLimiter;
 use Longman\TelegramBot\Commands\UserCommand;
 use Longman\TelegramBot\Request;
-use App\Services\AuthService;
-use App\Services\RateLimiter;
-use App\Services\GitLabService;
 
 class GitlabCommand extends UserCommand
 {

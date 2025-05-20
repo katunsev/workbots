@@ -1,5 +1,5 @@
 <?php
-namespace App\Models;
+namespace app\models;
 
 abstract class BaseModel
 {

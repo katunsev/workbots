@@ -1,8 +1,8 @@
 <?php
-namespace App\Repositories;
+namespace app\repositories;
 
 use PDO;
-use App\Models\BaseModel;
+use app\models\BaseModel;
 
 abstract class BaseRepository
 {

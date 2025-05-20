@@ -1,5 +1,5 @@
 <?php
-namespace App\Services;
+namespace app\services;
 
 use Gitlab\Client;
 

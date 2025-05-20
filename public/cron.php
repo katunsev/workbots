@@ -7,7 +7,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $config = require __DIR__ . '/../config/config.php';
 $usermap = require __DIR__ . '/../config/usersmap.php';
 
-use App\Services\GitLabService;
+use App\services\GitLabService;
 use Longman\TelegramBot\Request;
 use Longman\TelegramBot\Telegram;
 
