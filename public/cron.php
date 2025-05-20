@@ -16,18 +16,18 @@ $gitlab = new GitLabService(
     $config['gitlab']['token'],
     $config['gitlab']['project_id']
 );
-//
-//$gitlabUsers = $gitlab->getUsers(['active' => true, 'search' => 'dkatunsev']);
-//$users = [];
-//
-//foreach ($gitlabUsers as $gitlabUser) {
-//    if ($usermap[$gitlabUser['id']]) {
-//        $user = $usermap[$gitlabUser['id']];
-//        $user['username'] = $gitlabUser['username'];
-//        $user['name'] = $gitlabUser['name'];
-//        $users[] = $user;
-//    }
-//}
+
+$gitlabUsers = $gitlab->getUsers(['active' => true, 'search' => 'dkatunsev']);
+$users = [];
+
+foreach ($gitlabUsers as $gitlabUser) {
+    if ($usermap[$gitlabUser['id']]) {
+        $user = $usermap[$gitlabUser['id']];
+        $user['username'] = $gitlabUser['username'];
+        $user['name'] = $gitlabUser['name'];
+        $users[] = $user;
+    }
+}
 
 $issues = $gitlab->getOpenedIssuesWithoutEstimateOrLabels(['Status::В разработке', 'Status::На проверку', 'Status::Тестируется'],
     [
@@ -41,9 +41,14 @@ if (empty($issues)) {
     echo "Нет задач\n";
 } else {
     foreach ($issues as $issue) {
+        $assignees = $issue['assignees'];
+        $assigneeStr = '';
+        foreach ($assignees as $assignee) {
+            $assigneeStr .= $assignee['username'] . ', ';
+        }
         $title = $issue['title'];
         $link = $config['gitlab']['short_url'] . '/root/getcourse/-/issues/' . $issue['iid'];
-        $titles .= "[{$link}]({$title})" . PHP_EOL;
+        $titles .= "[{$link}]({$title}), " . "{$assigneeStr}" . PHP_EOL;
     }
 }
 
