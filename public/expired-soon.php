@@ -29,7 +29,7 @@ foreach ($gitlabUsers as $gitlabUser) {
     }
 }
 
-$issues = $gitlab->getOverdueIssuesIncludingToday(['Status::В разработке', 'Status::На проверку', 'Status::Тестируется'],
+$issues = $gitlab->getIssuesWithLowRemainingTimeIncludingToday(['Status::В разработке', 'Status::На проверку', 'Status::Тестируется'],
     [
         'milestone' => 'CRM Q2',
         'state' => 'opened',
@@ -47,7 +47,7 @@ if (empty($issues)) {
             $assigneeStr .= $assignee['username'] . ', ';
         }
         $title = $issue['title'];
-        $link = $issue['overdue_time'] . ' ' . $config['gitlab']['short_url'] . '/root/getcourse/-/issues/' . $issue['iid'];
+        $link = $issue['remaining_hours'] . ' ' . $config['gitlab']['short_url'] . '/root/getcourse/-/issues/' . $issue['iid'];
         $titles .= "[{$link}]({$title}), " . "{$assigneeStr}" . PHP_EOL;
     }
 }
@@ -59,7 +59,7 @@ $telegram->addCommandsPath(__DIR__ . '/../app/Telegram/Commands');
 if ($titles) {
     $result = Request::sendMessage([
         'chat_id' => $usermap[31]['chat_id'],
-        'text'    => 'Просроченные задачи: ' . PHP_EOL . $titles,
+        'text'    => 'Скоро просрочатся задачи: ' . PHP_EOL . $titles,
         'parse_mode' => 'MARKDOWN'
     ]);
 }
