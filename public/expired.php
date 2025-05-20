@@ -29,7 +29,7 @@ foreach ($gitlabUsers as $gitlabUser) {
     }
 }
 
-$issues = $gitlab->getOpenedIssuesWithoutEstimateOrLabels(['Status::В разработке', 'Status::На проверку', 'Status::Тестируется'],
+$issues = $gitlab->getOverdueIssuesFromUnestimatedOrLabeled(['Status::В разработке', 'Status::На проверку', 'Status::Тестируется'],
     [
         'milestone' => 'CRM Q2',
         'state' => 'opened',
@@ -58,8 +58,7 @@ $telegram->addCommandsPath(__DIR__ . '/../app/Telegram/Commands');
 
 if ($titles) {
     $result = Request::sendMessage([
-//        'chat_id' => $usermap[31]['chat_id'],
-        'chat_id' => -1002673878204,
+        'chat_id' => $usermap[31]['chat_id'],
         'text'    => 'Неоцененные задачи: ' . PHP_EOL . $titles,
         'parse_mode' => 'MARKDOWN'
     ]);
