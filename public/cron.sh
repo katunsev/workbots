@@ -10,7 +10,7 @@ add_cron_job() {
 }
 
 add_cron_job "*/30 9-18 * * 1-5 /usr/bin/php /var/www/katunsev.ru/public/cron.php"
-add_cron_job "*/00 9-18 * * 1-5 /usr/bin/php /var/www/katunsev.ru/public/expired.php"
+add_cron_job "0 9-18 * * 1-5 /usr/bin/php /var/www/katunsev.ru/public/expired.php"
 
 crontab "$CRON_TEMP"
 
