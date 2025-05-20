@@ -1,5 +1,5 @@
 <?php
-namespace app\repositories;
+namespace App\repositories;
 
 use PDO;
 use app\models\BaseModel;

@@ -1,5 +1,5 @@
 <?php
-namespace app\services;
+namespace App\services;
 
 abstract class BaseAuthService extends BaseService
 {

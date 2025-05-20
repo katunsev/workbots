@@ -1,5 +1,5 @@
 <?php
-namespace app\telegram\commands;
+namespace App\telegram\commands;
 
 use App\services\AuthService;
 use App\services\GitLabService;

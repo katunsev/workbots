@@ -1,5 +1,5 @@
 <?php
-namespace app\services;
+namespace App\services;
 
 class RateLimiter extends BaseService
 {
