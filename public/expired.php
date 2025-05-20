@@ -59,7 +59,7 @@ $telegram->addCommandsPath(__DIR__ . '/../app/Telegram/Commands');
 if ($titles) {
     $result = Request::sendMessage([
         'chat_id' => $usermap[31]['chat_id'],
-        'text'    => 'Неоцененные задачи: ' . PHP_EOL . $titles,
+        'text'    => 'Просроченные задачи: ' . PHP_EOL . $titles,
         'parse_mode' => 'MARKDOWN'
     ]);
 }
