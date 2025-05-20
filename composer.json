@@ -3,7 +3,7 @@
     "php": ">=7.4",
     "longman/telegram-bot": "^0.80",
     "m4tthumphrey/php-gitlab-api": "^11.14",
-    "vlucas/phpdotenv": "^5.5"
+    "vlucas/phpdotenv": "^5.6"
   },
   "autoload": {
     "psr-4": {
