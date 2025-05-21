@@ -6,7 +6,7 @@ use Dotenv\Dotenv;
 use Longman\TelegramBot\Request;
 use Longman\TelegramBot\Telegram;
 
-file_put_contents('webhook.log', file_get_contents('php://input') . PHP_EOL, FILE_APPEND);
+file_put_contents(__DIR__ . '/webhook.log', file_get_contents('php://input') . PHP_EOL, FILE_APPEND);
 
 
 // Загрузка .env
