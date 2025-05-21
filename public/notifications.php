@@ -9,7 +9,7 @@ $config = require __DIR__ . '/../config/config.php';
 use Longman\TelegramBot\Request;
 use Longman\TelegramBot\Telegram;
 
-$message = $argc[1] ?? null;
+$message = $argv[1] ?? null;
 
 if (!$message) {
     echo 'Сообщение не задано';
@@ -22,6 +22,6 @@ $telegram->addCommandsPath(__DIR__ . '/../app/Telegram/Commands');
 
 $result = Request::sendMessage([
     'chat_id' => $config['bots']['crm'],
-    'text'    => "{$message}: ",
+    'text'    => "{$message}",
     'parse_mode' => 'MARKDOWN'
 ]);

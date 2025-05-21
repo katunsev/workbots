@@ -10,5 +10,9 @@
   {
     "command": "/usr/bin/php /var/www/katunsev.ru/public/cron.php expired-soon",
     "schedule": "0 9-18 * * 1-5"
+  },
+  {
+    "command": "/usr/bin/php /var/www/katunsev.ru/public/notifications.php \"Спишите время за день\"",
+    "schedule": "0 17 * * 1-5"
   }
 ]
