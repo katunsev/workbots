@@ -1,7 +1,7 @@
 <?php
-$tasksFile = __DIR__ . '../config/tasks.json';
+$tasksFile = __DIR__ . '/../config/tasks.json';
 
-$locksDir = __DIR__ . '/locks';
+$locksDir = __DIR__ . '/../locks';
 
 if (!file_exists($locksDir)) {
     mkdir($locksDir, 0777, true);
