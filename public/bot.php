@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Dotenv\Dotenv;
+use Longman\TelegramBot\Request;
 use Longman\TelegramBot\Telegram;
 
 // Загрузка .env
@@ -14,6 +15,14 @@ $config = require __DIR__ . '/../config/config.php';
 // Укажите имя своего бота (как зарегистрировали в BotFather)
 $bot_name = 'MyBot';
 
+
+$result = Request::sendMessage([
+    'chat_id' => 207223883,
+    'text'    => "testtttt",
+    'parse_mode' => 'MARKDOWN'
+]);
+
+return;
 // Используем php-telegram-bot/core
 $telegram = new Telegram($config['telegram_bot_token'], $bot_name);
 
