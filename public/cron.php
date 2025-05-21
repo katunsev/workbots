@@ -18,7 +18,7 @@ $gitlab = new GitLabService(
 
 $function = '';
 $message = '';
-$type = $_GET['type'] ?? null;
+$type = $_GET['type'] ?? $argv[1] ?? null;
 
 if (!$type) {
     echo 'Тип операции не задан';
