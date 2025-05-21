@@ -1,14 +1,14 @@
 [
   {
-    "command": "/usr/bin/php /var/www/katunsev.ru/public/cron.php notestimate",
+    "command": "/usr/bin/php /var/www/katunsev.ru/public/issues.php notestimate",
     "schedule": "*/30 9-18 * * 1-5"
   },
   {
-    "command": "/usr/bin/php /var/www/katunsev.ru/public/cron.php expired",
+    "command": "/usr/bin/php /var/www/katunsev.ru/public/issues.php expired",
     "schedule": "0 9-18 * * 1-5"
   },
   {
-    "command": "/usr/bin/php /var/www/katunsev.ru/public/cron.php expired-soon",
+    "command": "/usr/bin/php /var/www/katunsev.ru/public/issues.php expired-soon",
     "schedule": "0 9-18 * * 1-5"
   },
   {
