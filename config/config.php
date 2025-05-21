@@ -29,5 +29,8 @@ return [
         'storage_path' => __DIR__ . '/../storage/rate_limits',
         'limit' => 5,
         'seconds' => 60,
-    ]
+    ],
+    'bots' => [
+        'crm' => -1002673878204
+    ],
 ];

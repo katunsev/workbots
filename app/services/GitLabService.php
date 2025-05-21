@@ -1,351 +1,276 @@
 <?php
+declare(strict_types=1);
+
 namespace App\services;
 
 use Gitlab\Client;
 
+/**
+ * Сервис для работы с задачами GitLab.
+ */
 class GitLabService extends BaseService
 {
     protected Client $client;
     protected string $projectId;
 
+    /**
+     * GitLabService constructor.
+     *
+     * @param string $url       URL GitLab
+     * @param string $token     Токен доступа
+     * @param string $projectId ID проекта
+     */
     public function __construct(string $url, string $token, string $projectId)
     {
         $this->client = new Client();
-        $apiUrl = rtrim($url, '/') . '/api/v4/';
-        $this->client->setUrl($apiUrl);
+        $this->client->setUrl(rtrim($url, '/') . '/api/v4/');
         $this->client->authenticate($token, Client::AUTH_HTTP_TOKEN);
         $this->projectId = $projectId;
     }
 
+    /**
+     * Получить задачи по фильтру.
+     *
+     * @param array $filter
+     * @return array
+     */
     public function getIssues(array $filter = []): array
     {
         return $this->client->issues()->all($this->projectId, $filter);
     }
 
+    /**
+     * Создать задачу.
+     *
+     * @param string      $title
+     * @param string|null $description
+     * @param array       $params
+     * @return array
+     */
     public function createIssue(string $title, ?string $description = null, array $params = []): array
     {
-        $data = array_merge(
-            ['title' => $title],
-            $description ? ['description' => $description] : [],
-            $params
-        );
+        $data = array_merge(['title' => $title], $description ? ['description' => $description] : [], $params);
         return $this->client->issues()->create($this->projectId, $data);
     }
 
+    /**
+     * Получить открытые задачи без оценки времени.
+     *
+     * @param array $additionalFilter
+     * @return array
+     */
     public function getOpenedIssuesWithoutEstimate(array $additionalFilter = []): array
     {
-        $filter = array_merge(['state' => 'opened'], $additionalFilter);
-        $filter['per_page'] = 100;
+        $filter = array_merge(['state' => 'opened', 'per_page' => 100], $additionalFilter);
+        $issues = $this->getIssues($filter);
 
-        $issues = $this->client->issues()->all($this->projectId, $filter);
-
-        $noEstimate = [];
-        foreach ($issues as $issue) {
-            $estimate = 0;
-            if (isset($issue['time_stats']['time_estimate'])) {
-                $estimate = $issue['time_stats']['time_estimate'];
-            } elseif (isset($issue['time_estimate'])) {
-                $estimate = $issue['time_estimate'];
-            }
-            if ($estimate == 0) {
-                $noEstimate[] = $issue;
-            }
-        }
-        return $noEstimate;
+        return array_values(array_filter($issues, fn(array $issue): bool => $this->getTimeEstimate($issue) === 0));
     }
 
     /**
-     * Получить открытые задачи без оценки, у которых есть хотя бы одна из указанных меток (ИЛИ).
-     * @param array $labels Массив меток для поиска с логикой ИЛИ.
-     * @param array $additionalFilter Прочие параметры фильтрации.
+     * Получить открытые задачи без оценки, с одной из указанных меток (логика ИЛИ).
+     *
+     * @param array $labels
+     * @param array $additionalFilter
      * @return array
      */
     public function getOpenedIssuesWithoutEstimateOrLabels(array $labels = [], array $additionalFilter = []): array
     {
         $filter = array_merge(['state' => 'opened', 'per_page' => 100], $additionalFilter);
-
         $issues = [];
-        $seen_ids = [];
+        $seen = [];
 
         foreach ($labels as $label) {
             $filter['labels'] = $label;
-            $batch = $this->client->issues()->all($this->projectId, $filter);
-
-            foreach ($batch as $issue) {
-                // Удаляем дубли (по id)
-                if (isset($seen_ids[$issue['id']])) {
-                    continue;
-                }
-
-                // Проверяем оценку
-                $estimate = 0;
-                if (isset($issue['time_stats']['time_estimate'])) {
-                    $estimate = $issue['time_stats']['time_estimate'];
-                } elseif (isset($issue['time_estimate'])) {
-                    $estimate = $issue['time_estimate'];
-                }
-
-                if ($estimate == 0) {
+            foreach ($this->getIssues($filter) as $issue) {
+                if (!isset($seen[$issue['id']]) && $this->getTimeEstimate($issue) === 0) {
                     $issues[] = $issue;
-                    $seen_ids[$issue['id']] = true;
+                    $seen[$issue['id']] = true;
                 }
             }
         }
-
         return $issues;
     }
 
     /**
-     * Получить открытые задачи без оценки по меткам (ИЛИ), у которых потраченное время >= оценочного.
+     * Получить открытые задачи, у которых осталось менее 20% времени по оценке (с учетом "неучтённого" времени сегодня).
      *
-     * @param array $labels Массив меток для поиска (ИЛИ). Можно пустой.
-     * @param array $additionalFilter Прочие параметры фильтрации.
-     * @return array
-     */
-    public function getOverdueIssuesFromUnestimatedOrLabeled(array $labels = [], array $additionalFilter = []): array
-    {
-        $filter = array_merge(['state' => 'opened', 'per_page' => 100], $additionalFilter);
-
-        $result = [];
-
-        foreach ($labels as $label) {
-            $filter['labels'] = $label;
-            $batch = $this->client->issues()->all($this->projectId, $filter);
-
-            foreach ($batch as $issue) {
-                $estimate = 0;
-                $spent = 0;
-                if (isset($issue['time_stats']['time_estimate'])) {
-                    $estimate = $issue['time_stats']['time_estimate'];
-                } elseif (isset($issue['time_estimate'])) {
-                    $estimate = $issue['time_estimate'];
-                }
-                if (isset($issue['time_stats']['total_time_spent'])) {
-                    $spent = $issue['time_stats']['total_time_spent'];
-                } elseif (isset($issue['total_time_spent'])) {
-                    $spent = $issue['total_time_spent'];
-                }
-
-                if ($spent >= $estimate) {
-                    $issue['expired'] = ($spent - $estimate) / 3600;
-                    $result[] = $issue;
-                }
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Получить открытые задачи, у которых осталось менее 20% от оценки времени,
-     * с учётом неучтённого сегодня времени (с 9:00 до сейчас или с момента последней смены метки).
-     *
-     * @param array $labels           Массив меток для поиска (логика ИЛИ).
-     * @param array $additionalFilter Прочие параметры фильтрации.
+     * @param array $labels
+     * @param array $additionalFilter
      * @return array
      */
     public function getIssuesWithLowRemainingTimeIncludingToday(array $labels = [], array $additionalFilter = []): array
     {
-        $filter       = array_merge([
-            'state'    => 'opened',
-            'per_page' => 100,
-        ], $additionalFilter);
-
-        $issues       = [];
-        $seenIds      = [];
-        $thresholdPct = 0.2; // 20%
-
-        $tz         = new \DateTimeZone('Europe/Amsterdam');
-        $now        = new \DateTime('now', $tz);
-        $startOfDay = (clone $now)->setTime(9, 0, 0);
-        $endOfDay   = (clone $now)->setTime(18, 0, 0);
-        if ($now > $endOfDay) {
-            $now = $endOfDay;
-        }
-
-        $labelSets = !empty($labels) ? $labels : [null];
-
-        foreach ($labelSets as $label) {
-            if ($label !== null) {
-                $filter['labels'] = $label;
-            } else {
-                unset($filter['labels']);
+        return $this->getFilteredIssuesByTime(
+            $labels,
+            $additionalFilter,
+            function(int $estimate, int $totalSpent): bool {
+                return $estimate > 0 && $totalSpent <= $estimate && $estimate - $totalSpent <= $estimate * 0.2;
+            },
+            function(array $issue, int $remaining, int $additional): array {
+                $issue['remaining_hours'] = $this->formatTime($remaining);
+                $issue['additional_today_hours'] = round($additional / 3600, 2);
+                return $issue;
             }
-
-            $batch = $this->client->issues()->all($this->projectId, $filter);
-            foreach ($batch as $issue) {
-                $iid = $issue['iid'];
-                if (isset($seenIds[$iid])) {
-                    continue;
-                }
-                $seenIds[$iid] = true;
-
-                $estimate = $issue['time_stats']['time_estimate']
-                    ?? $issue['time_estimate']
-                    ?? 0;
-                if ($estimate <= 0) {
-                    continue;
-                }
-
-                $spent = $issue['time_stats']['total_time_spent']
-                    ?? $issue['total_time_spent']
-                    ?? 0;
-
-                // Определяем старт для учёта сегодня
-                $start = $startOfDay;
-                $events = $this->client->resourceLabelEvents()
-                    ->all($this->projectId, $iid, ['per_page' => 100]);
-                foreach ($events as $ev) {
-                    $created = new \DateTime($ev['created_at'], $tz);
-                    if ($created >= $startOfDay && $created <= $now && $created > $start) {
-                        $start = $created;
-                    }
-                }
-
-                // «Неучтённое» время сегодня
-                $additional = max(0, $now->getTimestamp() - $start->getTimestamp());
-                $totalSpent = $spent + $additional;
-
-                $remaining = max(0, $estimate - $totalSpent);
-
-                if ($remaining <= $estimate * $thresholdPct) {
-                    // Форматируем оставшееся время в Xd Yh Zm
-                    $days    = floor($remaining / 86400);
-                    $hours   = floor(($remaining % 86400) / 3600);
-                    $minutes = floor(($remaining % 3600) / 60);
-
-                    $parts = [];
-                    if ($days > 0) {
-                        $parts[] = "{$days}d";
-                    }
-                    if ($hours > 0) {
-                        $parts[] = "{$hours}h";
-                    }
-                    if ($minutes > 0) {
-                        $parts[] = "{$minutes}m";
-                    }
-                    if (empty($parts)) {
-                        $parts[] = "0m";
-                    }
-                    $issue['remaining_hours'] = implode(' ', $parts);
-
-                    // Дополнительно оставляем информацию о «неучтённом» сегодня
-                    $issue['additional_today_hours'] = round($additional / 3600, 2);
-
-                    $issues[] = $issue;
-                }
-            }
-        }
-
-        return $issues;
+        );
     }
 
     /**
-     * Получить открытые просроченные задачи,
-     * с учётом неучтённого сегодня времени (с 9:00 до сейчас или с момента последней смены метки).
+     * Получить открытые просроченные задачи (с учетом "неучтённого" времени сегодня).
      *
-     * @param array $labels           Массив меток для поиска (логика ИЛИ).
-     * @param array $additionalFilter Прочие параметры фильтрации.
+     * @param array $labels
+     * @param array $additionalFilter
      * @return array
      */
     public function getOverdueIssuesIncludingToday(array $labels = [], array $additionalFilter = []): array
     {
-        $filter       = array_merge([
-            'state'    => 'opened',
-            'per_page' => 100,
-        ], $additionalFilter);
-
-        $issues       = [];
-        $seenIds      = [];
-
-        // Таймзона, начало/конец рабочего дня
-        $tz         = new \DateTimeZone('Europe/Amsterdam');
-        $now        = new \DateTime('now', $tz);
-        $startOfDay = (clone $now)->setTime(9, 0, 0);
-        $endOfDay   = (clone $now)->setTime(18, 0, 0);
-        if ($now > $endOfDay) {
-            $now = $endOfDay;
-        }
-
-        // Если метки не заданы, обрабатываем один раз без фильтра по labels
-        $labelSets = !empty($labels) ? $labels : [null];
-
-        foreach ($labelSets as $label) {
-            if ($label !== null) {
-                $filter['labels'] = $label;
-            } else {
-                unset($filter['labels']);
+        return $this->getFilteredIssuesByTime(
+            $labels,
+            $additionalFilter,
+            function(int $estimate, int $totalSpent): bool {
+                return $estimate > 0 && $totalSpent > $estimate;
+            },
+            function(array $issue, int $overdue, int $additional): array {
+                $issue['overdue_time'] = $this->formatTime($overdue);
+                $issue['additional_today_hours'] = round($additional / 3600, 2);
+                return $issue;
             }
-
-            $batch = $this->client->issues()->all($this->projectId, $filter);
-            foreach ($batch as $issue) {
-                $iid = $issue['iid'];
-                if (isset($seenIds[$iid])) {
-                    continue;
-                }
-                $seenIds[$iid] = true;
-
-                // 1) Оценка
-                $estimate = $issue['time_stats']['time_estimate']
-                    ?? $issue['time_estimate']
-                    ?? 0;
-                if ($estimate <= 0) {
-                    continue;
-                }
-
-                // 2) Уже учтённое
-                $spent = $issue['time_stats']['total_time_spent']
-                    ?? $issue['total_time_spent']
-                    ?? 0;
-
-                // 3) Определяем старт «с учётом меток»
-                $start = $startOfDay;
-                $events = $this->client->resourceLabelEvents()
-                    ->all($this->projectId, $iid, ['per_page' => 100]);
-                foreach ($events as $ev) {
-                    $created = new \DateTime($ev['created_at'], $tz);
-                    if ($created >= $startOfDay && $created <= $now && $created > $start) {
-                        $start = $created;
-                    }
-                }
-
-                // 4) «Неучтённое» сегодня
-                $additional = max(0, $now->getTimestamp() - $start->getTimestamp());
-                $totalSpent = $spent + $additional;
-
-                // 5) Проверяем просрочку: потрачено больше оценки
-                if ($totalSpent > $estimate) {
-                    $overdueSec = $totalSpent - $estimate;
-
-                    // Форматируем в Xd Yh Zm
-                    $days    = floor($overdueSec / 86400);
-                    $hours   = floor(($overdueSec % 86400) / 3600);
-                    $minutes = floor(($overdueSec % 3600) / 60);
-
-                    $parts = [];
-                    if ($days > 0)    $parts[] = "{$days}d";
-                    if ($hours > 0)   $parts[] = "{$hours}h";
-                    if ($minutes > 0) $parts[] = "{$minutes}m";
-                    if (empty($parts)) {
-                        $parts[] = "0m";
-                    }
-
-                    $issue['overdue_time']           = implode(' ', $parts);
-                    $issue['additional_today_hours'] = round($additional / 3600, 2);
-
-                    $issues[] = $issue;
-                }
-            }
-        }
-
-        return $issues;
+        );
     }
 
-
-
-
+    /**
+     * Получить пользователей по фильтру.
+     *
+     * @param array $filter
+     * @return array
+     */
     public function getUsers(array $filter = []): array
     {
         return $this->client->users()->all($filter);
+    }
+
+    // ================== PRIVATE HELPERS ==================
+
+    /**
+     * Получить оценку времени из задачи.
+     *
+     * @param array $issue
+     * @return int
+     */
+    private function getTimeEstimate(array $issue): int
+    {
+        return (int)($issue['time_stats']['time_estimate'] ?? $issue['time_estimate'] ?? 0);
+    }
+
+    /**
+     * Получить потраченное время из задачи.
+     *
+     * @param array $issue
+     * @return int
+     */
+    private function getTimeSpent(array $issue): int
+    {
+        return (int)($issue['time_stats']['total_time_spent'] ?? $issue['total_time_spent'] ?? 0);
+    }
+
+    /**
+     * Универсальный фильтр задач по времени.
+     *
+     * @param array    $labels
+     * @param array    $additionalFilter
+     * @param callable $timeFilter function(int $estimate, int $totalSpent): bool
+     * @param callable $formatter  function(array $issue, int $diff, int $additional): array
+     * @return array
+     */
+    private function getFilteredIssuesByTime(
+        array $labels,
+        array $additionalFilter,
+        callable $timeFilter,
+        callable $formatter
+    ): array
+    {
+        $filter = array_merge(['state' => 'opened', 'per_page' => 100], $additionalFilter);
+        $tz = new \DateTimeZone('Europe/Amsterdam');
+        $now = new \DateTime('now', $tz);
+        $startOfDay = (clone $now)->setTime(9, 0, 0);
+        $endOfDay = (clone $now)->setTime(18, 0, 0);
+        if ($now > $endOfDay) $now = $endOfDay;
+        $labelSets = !empty($labels) ? $labels : [null];
+        $issues = [];
+        $seen = [];
+        foreach ($labelSets as $label) {
+            if ($label !== null) $filter['labels'] = $label; else unset($filter['labels']);
+            foreach ($this->getIssues($filter) as $issue) {
+                $iid = $issue['iid'];
+                if (isset($seen[$iid])) continue;
+                $seen[$iid] = true;
+                $estimate = $this->getTimeEstimate($issue);
+                if ($estimate <= 0) continue;
+                $spent = $this->getTimeSpent($issue);
+                $start = $this->getLastLabelEventTime($iid, $startOfDay, $now, $tz) ?? $startOfDay;
+                $additional = max(0, $now->getTimestamp() - $start->getTimestamp());
+                $totalSpent = $spent + $additional;
+                $remaining = max(0, $estimate - $totalSpent);
+                $overdue = $totalSpent - $estimate;
+                // В зависимости от фильтра либо оставшееся, либо просрочка
+                $diff = $timeFilter === $this->getLowRemainingTimeFilter() ? $remaining : $overdue;
+                if ($timeFilter($estimate, $totalSpent)) {
+                    $issues[] = $formatter($issue, $diff, $additional);
+                }
+            }
+        }
+        return $issues;
+    }
+
+    /**
+     * Получить время последней смены метки за сегодня.
+     *
+     * @param int             $iid
+     * @param \DateTime       $startOfDay
+     * @param \DateTime       $now
+     * @param \DateTimeZone   $tz
+     * @return \DateTime|null
+     */
+    private function getLastLabelEventTime(int $iid, \DateTime $startOfDay, \DateTime $now, \DateTimeZone $tz): ?\DateTime
+    {
+        $events = $this->client->resourceLabelEvents()->all($this->projectId, $iid, ['per_page' => 100]);
+        $last = null;
+        foreach ($events as $ev) {
+            $created = new \DateTime($ev['created_at'], $tz);
+            if ($created >= $startOfDay && $created <= $now && ($last === null || $created > $last)) {
+                $last = $created;
+            }
+        }
+        return $last;
+    }
+
+    /**
+     * Форматирование секунд в вид "Xd Yh Zm".
+     *
+     * @param int $seconds
+     * @return string
+     */
+    private function formatTime(int $seconds): string
+    {
+        $days = intdiv($seconds, 86400);
+        $hours = intdiv($seconds % 86400, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+        $parts = [];
+        if ($days > 0) $parts[] = "{$days}d";
+        if ($hours > 0) $parts[] = "{$hours}h";
+        if ($minutes > 0) $parts[] = "{$minutes}m";
+        return $parts ? implode(' ', $parts) : '0m';
+    }
+
+    /**
+     * Для передачи в getFilteredIssuesByTime (пример фильтра для "мало осталось")
+     *
+     * @return callable
+     */
+    private function getLowRemainingTimeFilter(): callable
+    {
+        return function(int $estimate, int $totalSpent): bool {
+            return $estimate > 0 && $totalSpent <= $estimate && $estimate - $totalSpent <= $estimate * 0.2;
+        };
     }
 }
